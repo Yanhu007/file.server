@@ -504,7 +504,24 @@ async function uploadFiles(files) {
         });
     }
     
-    // 并发上传所有文件
+    // 检查是否只有一个文件，如果是则单独处理
+    if (files.length === 1) {
+        try {
+            await uploadSingleFile(fileItems[0]);
+            showMessage('文件上传成功', 'success');
+            // 单文件上传完成后立即关闭并刷新
+            setTimeout(() => {
+                hideModal(uploadModal);
+                loadFileList(currentPath);
+            }, 800);
+        } catch (error) {
+            console.error('上传文件失败:', error);
+            updateFileItemStatus(fileItems[0], 'error', error.message);
+        }
+        return;
+    }
+    
+    // 多文件并发上传
     const uploadPromises = fileItems.map(async (fileItem) => {
         try {
             await uploadSingleFile(fileItem);
@@ -517,22 +534,25 @@ async function uploadFiles(files) {
     // 等待所有文件上传完成
     await Promise.allSettled(uploadPromises);
     
-    // 检查是否所有文件都上传完成
-    const completedFiles = fileItems.filter(item => item.completed).length;
-    const totalFiles = fileItems.length;
-    
-    // 显示完成消息
-    if (completedFiles === totalFiles) {
-        showMessage(`成功上传 ${completedFiles} 个文件`, 'success');
-    } else {
-        showMessage(`上传完成：${completedFiles}/${totalFiles} 个文件成功`, 'warning');
-    }
-    
-    // 延迟后关闭模态框并刷新列表
+    // 等待一点时间确保所有状态更新完成
     setTimeout(() => {
-        hideModal(uploadModal);
-        loadFileList(currentPath);
-    }, 1500);
+        // 检查是否所有文件都上传完成
+        const completedFiles = fileItems.filter(item => item.completed).length;
+        const totalFiles = fileItems.length;
+        
+        // 显示完成消息
+        if (completedFiles === totalFiles) {
+            showMessage(`成功上传 ${completedFiles} 个文件`, 'success');
+        } else {
+            showMessage(`上传完成：${completedFiles}/${totalFiles} 个文件成功`, 'warning');
+        }
+        
+        // 延迟后关闭模态框并刷新列表
+        setTimeout(() => {
+            hideModal(uploadModal);
+            loadFileList(currentPath);
+        }, 1000);
+    }, 500);
 }
 
 // 创建单个文件上传项
@@ -586,12 +606,18 @@ async function uploadSingleFile(fileItem) {
             progressText.textContent = Math.round(progress) + '%';
             
             // 更新状态文本
-            statusElement.innerHTML = `<i class="fas fa-spinner fa-spin"></i> 上传中... ${Math.round(progress)}%`;
+            if (progress < 100) {
+                statusElement.innerHTML = `<i class="fas fa-spinner fa-spin"></i> 上传中... ${Math.round(progress)}%`;
+            } else {
+                statusElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 处理中...';
+            }
         });
         
-        // 上传成功
-        fileItem.completed = true;
-        updateFileItemStatus(fileItem, 'completed', '上传完成');
+        // 确保上传完成
+        setTimeout(() => {
+            fileItem.completed = true;
+            updateFileItemStatus(fileItem, 'completed', '上传完成');
+        }, 100);
         
     } catch (error) {
         // 上传失败
