@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件管理器</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1><i class="fas fa-folder-open"></i> 文件管理器</h1>
+            <div class="header-actions">
+                <button id="dashboardBtn" class="btn btn-info">
+                    <i class="fas fa-chart-bar"></i> 统计面板
+                </button>
+                <button id="uploadBtn" class="btn btn-primary">
+                    <i class="fas fa-cloud-upload-alt"></i> 上传文件
+                </button>
+                <button id="newFolderBtn" class="btn btn-success">
+                    <i class="fas fa-folder-plus"></i> 新建文件夹
+                </button>
+                <button id="newFileBtn" class="btn btn-secondary">
+                    <i class="fas fa-file-plus"></i> 新建文件
+                </button>
+            </div>
+        </header>
+
+        <nav class="breadcrumb">
+            <span id="breadcrumbPath">
+                <i class="fas fa-home"></i> 根目录
+            </span>
+        </nav>
+
+        <main class="main-content">
+            <div class="file-list-container">
+                <div class="loading" id="loading">
+                    <i class="fas fa-spinner fa-spin"></i> 加载中...
+                </div>
+                <div class="file-list" id="fileList">
+                    <!-- 文件列表将在这里动态生成 -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 上传文件模态框 -->
+    <div id="uploadModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-cloud-upload-alt"></i> 上传文件</h3>
+                <span class="close" id="closeUpload">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="upload-area" id="uploadArea">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <p>点击选择文件或拖拽文件到此处</p>
+                    <input type="file" id="fileInput" multiple hidden>
+                </div>
+                <div class="upload-progress" id="uploadProgress" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <span class="progress-text" id="progressText">0%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新建文件夹模态框 -->
+    <div id="folderModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-folder-plus"></i> 新建文件夹</h3>
+                <span class="close" id="closeFolder">&times;</span>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="folderName" placeholder="请输入文件夹名称" class="input-field">
+                <div class="modal-actions">
+                    <button id="createFolderBtn" class="btn btn-primary">创建</button>
+                    <button id="cancelFolderBtn" class="btn btn-secondary">取消</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新建文件模态框 -->
+    <div id="fileModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-file-plus"></i> 新建文件</h3>
+                <span class="close" id="closeFile">&times;</span>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="fileName" placeholder="请输入文件名称（包括扩展名）" class="input-field">
+                <div class="modal-actions">
+                    <button id="createFileBtn" class="btn btn-primary">创建</button>
+                    <button id="cancelFileBtn" class="btn btn-secondary">取消</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 文件编辑模态框 -->
+    <div id="editModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3><i class="fas fa-edit"></i> 编辑文件: <span id="editFileName"></span></h3>
+                <span class="close" id="closeEdit">&times;</span>
+            </div>
+            <div class="modal-body">
+                <textarea id="fileContent" class="file-editor" placeholder="文件内容..."></textarea>
+                <div class="modal-actions">
+                    <button id="saveFileBtn" class="btn btn-primary">保存</button>
+                    <button id="cancelEditBtn" class="btn btn-secondary">取消</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 统计面板模态框 -->
+    <div id="dashboardModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3><i class="fas fa-chart-bar"></i> 下载统计面板</h3>
+                <span class="close" id="closeDashboard">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="dashboardContent">
+                    <div class="loading">
+                        <i class="fas fa-spinner fa-spin"></i> 加载统计数据中...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 确认删除模态框 -->
+    <div id="deleteModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-exclamation-triangle"></i> 确认删除</h3>
+                <span class="close" id="closeDelete">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p>确定要删除 "<span id="deleteItemName"></span>" 吗？</p>
+                <p class="warning-text">此操作不可撤销！</p>
+                <div class="modal-actions">
+                    <button id="confirmDeleteBtn" class="btn btn-danger">确认删除</button>
+                    <button id="cancelDeleteBtn" class="btn btn-secondary">取消</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 消息提示 -->
+    <div id="messageContainer" class="message-container"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
