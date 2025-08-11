@@ -161,22 +161,27 @@ function createFileElement(item) {
     const date = new Date(item.lastModified).toLocaleDateString('zh-CN');
     
     fileDiv.innerHTML = `
-        <div class="file-icon ${icon.class}">
-            <i class="${icon.icon}"></i>
-        </div>
-        <div class="file-name">${escapeHtml(item.name)}</div>
-        <div class="file-info">
-            ${size ? `大小: ${size} | ` : ''}修改时间: ${date}
+        <div class="file-content" onclick="${item.isDirectory ? `openDirectory('${escapeHtml(item.path)}')` : `downloadFile('${escapeHtml(item.path)}')`}">
+            <div class="file-icon ${icon.class}">
+                <i class="${icon.icon}"></i>
+            </div>
+            <div class="file-name">${escapeHtml(item.name)}</div>
+            <div class="file-info">
+                ${size ? `大小: ${size} | ` : ''}修改时间: ${date}
+            </div>
         </div>
         <div class="file-actions">
-            ${item.isDirectory ? 
+            ${item.isDirectory ?
                 `<button class="btn btn-primary file-action-btn" onclick="openDirectory('${escapeHtml(item.path)}')">
                     <i class="fas fa-folder-open"></i> 打开
                 </button>` :
                 `<button class="btn btn-info file-action-btn" onclick="downloadFile('${escapeHtml(item.path)}')">
                     <i class="fas fa-download"></i> 下载
                 </button>
-                ${isEditableFile(item.name) ? 
+                <button class="btn btn-secondary file-action-btn" onclick="copyFileUrl('${escapeHtml(item.path)}')">
+                    <i class="fas fa-copy"></i> 复制链接
+                </button>
+                ${isEditableFile(item.name) ?
                     `<button class="btn btn-warning file-action-btn" onclick="editFile('${escapeHtml(item.path)}')">
                         <i class="fas fa-edit"></i> 编辑
                     </button>` : ''
@@ -188,13 +193,10 @@ function createFileElement(item) {
         </div>
     `;
 
-    // 双击事件
-    fileDiv.addEventListener('dblclick', () => {
-        if (item.isDirectory) {
-            openDirectory(item.path);
-        } else {
-            downloadFile(item.path);
-        }
+    // 阻止文件操作按钮的事件冒泡
+    const fileActions = fileDiv.querySelector('.file-actions');
+    fileActions.addEventListener('click', (e) => {
+        e.stopPropagation();
     });
 
     return fileDiv;
@@ -314,6 +316,52 @@ function downloadFile(path) {
     document.body.removeChild(link);
     
     showMessage('开始下载文件', 'info');
+}
+
+function copyFileUrl(path) {
+    const fileUrl = `${window.location.origin}/api/download/${encodeURIComponent(path)}`;
+    
+    // 使用现代的 Clipboard API
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(fileUrl).then(() => {
+            showMessage('文件链接已复制到剪贴板', 'success');
+        }).catch(err => {
+            console.error('复制失败:', err);
+            fallbackCopyTextToClipboard(fileUrl);
+        });
+    } else {
+        // 回退方案
+        fallbackCopyTextToClipboard(fileUrl);
+    }
+}
+
+function fallbackCopyTextToClipboard(text) {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    
+    // 避免滚动到底部
+    textArea.style.top = '0';
+    textArea.style.left = '0';
+    textArea.style.position = 'fixed';
+    textArea.style.opacity = '0';
+    
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    
+    try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+            showMessage('文件链接已复制到剪贴板', 'success');
+        } else {
+            showMessage('复制失败，请手动复制链接', 'error');
+        }
+    } catch (err) {
+        console.error('复制失败:', err);
+        showMessage('复制失败，请手动复制链接', 'error');
+    }
+    
+    document.body.removeChild(textArea);
 }
 
 async function editFile(path) {

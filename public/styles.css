@@ -183,16 +183,25 @@ body {
     background: white;
     border: 1px solid #e9ecef;
     border-radius: 8px;
-    padding: 1rem;
     transition: all 0.3s ease;
-    cursor: pointer;
     position: relative;
+    overflow: hidden;
 }
 
 .file-item:hover {
     box-shadow: 0 4px 15px rgba(0,0,0,0.1);
     transform: translateY(-2px);
     border-color: #007bff;
+}
+
+.file-content {
+    padding: 1rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.file-content:hover {
+    background-color: rgba(0, 123, 255, 0.05);
 }
 
 .file-item.directory {
@@ -249,6 +258,9 @@ body {
 .file-actions {
     display: flex;
     gap: 0.25rem;
+    padding: 0.5rem 1rem;
+    background-color: rgba(248, 249, 250, 0.8);
+    border-top: 1px solid #e9ecef;
     opacity: 0;
     transition: opacity 0.3s ease;
 }
