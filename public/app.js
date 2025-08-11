@@ -1,6 +1,8 @@
 // 全局变量
 let currentPath = '';
 let editingFilePath = '';
+let findMatches = [];
+let currentMatchIndex = -1;
 
 // DOM元素
 const fileList = document.getElementById('fileList');
@@ -82,6 +84,23 @@ function bindEvents() {
     // 文件编辑事件
     document.getElementById('saveFileBtn').addEventListener('click', saveFile);
     document.getElementById('cancelEditBtn').addEventListener('click', () => hideModal(editModal));
+
+    // 查找替换事件
+    document.getElementById('findReplaceBtn').addEventListener('click', toggleFindReplacePanel);
+    document.getElementById('closeFindReplaceBtn').addEventListener('click', closeFindReplacePanel);
+    document.getElementById('findInput').addEventListener('input', performFind);
+    document.getElementById('findPrevBtn').addEventListener('click', findPrevious);
+    document.getElementById('findNextBtn').addEventListener('click', findNext);
+    document.getElementById('replaceBtn').addEventListener('click', replaceCurrentMatch);
+    document.getElementById('replaceAllBtn').addEventListener('click', replaceAll);
+    document.getElementById('caseSensitiveCheck').addEventListener('change', performFind);
+    document.getElementById('wholeWordCheck').addEventListener('change', performFind);
+
+    // 编辑器内容变化事件
+    document.getElementById('fileContent').addEventListener('input', updateEditorStats);
+
+    // 编辑器键盘事件
+    document.getElementById('fileContent').addEventListener('keydown', handleEditorKeydown);
 
     // 删除确认事件
     document.getElementById('confirmDeleteBtn').addEventListener('click', confirmDelete);
@@ -377,6 +396,7 @@ async function editFile(path) {
         document.getElementById('editFileName').textContent = data.filename;
         document.getElementById('fileContent').value = data.content;
         
+        updateEditorStats();
         showModal(editModal);
     } catch (error) {
         console.error('读取文件失败:', error);
@@ -657,4 +677,251 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// 查找替换功能
+function toggleFindReplacePanel() {
+    const panel = document.getElementById('findReplacePanel');
+    const isVisible = panel.style.display !== 'none';
+    
+    if (isVisible) {
+        closeFindReplacePanel();
+    } else {
+        panel.style.display = 'block';
+        const findInput = document.getElementById('findInput');
+        findInput.focus();
+        
+        // 如果编辑器中有选中的文本，自动填入查找框
+        const editor = document.getElementById('fileContent');
+        const selectedText = editor.value.substring(editor.selectionStart, editor.selectionEnd);
+        if (selectedText) {
+            findInput.value = selectedText;
+            performFind();
+        }
+    }
+}
+
+function closeFindReplacePanel() {
+    const panel = document.getElementById('findReplacePanel');
+    panel.style.display = 'none';
+    clearHighlights();
+    findMatches = [];
+    currentMatchIndex = -1;
+    
+    // 清空输入框
+    document.getElementById('findInput').value = '';
+    document.getElementById('replaceInput').value = '';
+    document.getElementById('findStatus').textContent = '';
+}
+
+function performFind() {
+    const findText = document.getElementById('findInput').value;
+    const editor = document.getElementById('fileContent');
+    const content = editor.value;
+    
+    clearHighlights();
+    findMatches = [];
+    currentMatchIndex = -1;
+    
+    if (!findText) {
+        document.getElementById('findStatus').textContent = '';
+        return;
+    }
+
+    const caseSensitive = document.getElementById('caseSensitiveCheck').checked;
+    const wholeWord = document.getElementById('wholeWordCheck').checked;
+    
+    let searchContent = content;
+    let searchText = findText;
+    
+    if (!caseSensitive) {
+        searchContent = content.toLowerCase();
+        searchText = findText.toLowerCase();
+    }
+
+    let index = 0;
+    while (true) {
+        let foundIndex = searchContent.indexOf(searchText, index);
+        if (foundIndex === -1) break;
+        
+        // 检查全词匹配
+        if (wholeWord) {
+            const beforeChar = foundIndex > 0 ? content[foundIndex - 1] : '';
+            const afterChar = foundIndex + findText.length < content.length ?
+                content[foundIndex + findText.length] : '';
+            
+            const isWordBoundary = (char) => /\W/.test(char) || char === '';
+            
+            if (!isWordBoundary(beforeChar) || !isWordBoundary(afterChar)) {
+                index = foundIndex + 1;
+                continue;
+            }
+        }
+        
+        findMatches.push({
+            start: foundIndex,
+            end: foundIndex + findText.length
+        });
+        
+        index = foundIndex + 1;
+    }
+
+    updateFindStatus();
+    
+    if (findMatches.length > 0) {
+        currentMatchIndex = 0;
+        scrollToCurrentMatch();
+    }
+}
+
+function findNext() {
+    if (findMatches.length === 0) return;
+    
+    currentMatchIndex = (currentMatchIndex + 1) % findMatches.length;
+    scrollToCurrentMatch();
+    updateFindStatus();
+}
+
+function findPrevious() {
+    if (findMatches.length === 0) return;
+    
+    currentMatchIndex = currentMatchIndex <= 0 ?
+        findMatches.length - 1 : currentMatchIndex - 1;
+    scrollToCurrentMatch();
+    updateFindStatus();
+}
+
+function replaceCurrentMatch() {
+    if (findMatches.length === 0 || currentMatchIndex === -1) {
+        showMessage('没有找到要替换的内容', 'warning');
+        return;
+    }
+
+    const replaceText = document.getElementById('replaceInput').value;
+    const editor = document.getElementById('fileContent');
+    const currentMatch = findMatches[currentMatchIndex];
+    
+    // 执行替换
+    const content = editor.value;
+    const newContent = content.substring(0, currentMatch.start) +
+                      replaceText +
+                      content.substring(currentMatch.end);
+    
+    editor.value = newContent;
+    
+    // 重新查找以更新匹配位置
+    const findText = document.getElementById('findInput').value;
+    if (findText) {
+        performFind();
+    }
+    
+    updateEditorStats();
+    showMessage('替换成功', 'success');
+}
+
+function replaceAll() {
+    if (findMatches.length === 0) {
+        showMessage('没有找到要替换的内容', 'warning');
+        return;
+    }
+
+    const replaceText = document.getElementById('replaceInput').value;
+    const findText = document.getElementById('findInput').value;
+    const editor = document.getElementById('fileContent');
+    
+    const caseSensitive = document.getElementById('caseSensitiveCheck').checked;
+    const wholeWord = document.getElementById('wholeWordCheck').checked;
+    
+    let content = editor.value;
+    let flags = 'g';
+    if (!caseSensitive) flags += 'i';
+    
+    let regex;
+    if (wholeWord) {
+        const escapedFind = findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        regex = new RegExp(`\\b${escapedFind}\\b`, flags);
+    } else {
+        const escapedFind = findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        regex = new RegExp(escapedFind, flags);
+    }
+    
+    const replacedContent = content.replace(regex, replaceText);
+    const replaceCount = (content.match(regex) || []).length;
+    
+    editor.value = replacedContent;
+    updateEditorStats();
+    
+    // 清除高亮并重新查找
+    clearHighlights();
+    findMatches = [];
+    currentMatchIndex = -1;
+    performFind();
+    
+    showMessage(`成功替换 ${replaceCount} 处`, 'success');
+}
+
+function scrollToCurrentMatch() {
+    if (currentMatchIndex === -1 || findMatches.length === 0) return;
+    
+    const editor = document.getElementById('fileContent');
+    const currentMatch = findMatches[currentMatchIndex];
+    
+    // 设置光标位置到当前匹配
+    editor.selectionStart = currentMatch.start;
+    editor.selectionEnd = currentMatch.end;
+    editor.focus();
+    
+    // 滚动到可见位置
+    const lineHeight = 20; // 估算的行高
+    const lines = editor.value.substring(0, currentMatch.start).split('\n').length;
+    const scrollTop = Math.max(0, (lines - 5) * lineHeight);
+    editor.scrollTop = scrollTop;
+}
+
+function updateFindStatus() {
+    const statusElement = document.getElementById('findStatus');
+    
+    if (findMatches.length === 0) {
+        statusElement.textContent = '未找到';
+        statusElement.className = 'find-status not-found';
+    } else {
+        statusElement.textContent = `${currentMatchIndex + 1} / ${findMatches.length}`;
+        statusElement.className = 'find-status found';
+    }
+}
+
+function clearHighlights() {
+    // 清除高亮的简化实现
+    // 在真实的编辑器中，通常需要更复杂的文本高亮逻辑
+}
+
+function updateEditorStats() {
+    const editor = document.getElementById('fileContent');
+    const content = editor.value;
+    
+    const lines = content.split('\n').length;
+    const chars = content.length;
+    
+    const statsElement = document.getElementById('editorStats');
+    if (statsElement) {
+        statsElement.textContent = `行: ${lines}, 字符: ${chars}`;
+    }
+}
+
+function handleEditorKeydown(e) {
+    if (e.ctrlKey && e.key === 'f') {
+        e.preventDefault();
+        toggleFindReplacePanel();
+    }
+    if (e.key === 'Escape') {
+        closeFindReplacePanel();
+    }
+    if (e.ctrlKey && e.key === 'h') {
+        e.preventDefault();
+        toggleFindReplacePanel();
+        // 聚焦到替换输入框
+        setTimeout(() => {
+            document.getElementById('replaceInput').focus();
+        }, 100);
+    }
 }
