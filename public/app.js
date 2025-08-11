@@ -122,12 +122,11 @@ function hideModal(modal) {
     const inputs = modal.querySelectorAll('input, textarea');
     inputs.forEach(input => input.value = '');
     
-    // 重置上传进度
-    const uploadProgress = document.getElementById('uploadProgress');
-    if (uploadProgress) {
-        uploadProgress.style.display = 'none';
-        document.getElementById('progressFill').style.width = '0%';
-        document.getElementById('progressText').textContent = '0%';
+    // 重置上传文件容器
+    const uploadFilesContainer = document.getElementById('uploadFilesContainer');
+    if (uploadFilesContainer) {
+        uploadFilesContainer.style.display = 'none';
+        uploadFilesContainer.innerHTML = '';
     }
 }
 
@@ -485,59 +484,159 @@ function handleFileSelect(e) {
 }
 
 async function uploadFiles(files) {
-    const uploadProgress = document.getElementById('uploadProgress');
-    const progressFill = document.getElementById('progressFill');
-    const progressText = document.getElementById('progressText');
+    const uploadFilesContainer = document.getElementById('uploadFilesContainer');
     
-    uploadProgress.style.display = 'block';
-    progressFill.style.width = '0%';
-    progressText.textContent = '0%';
+    // 显示文件列表容器
+    uploadFilesContainer.style.display = 'block';
+    uploadFilesContainer.innerHTML = '';
     
-    let completedFiles = 0;
-    let totalSize = 0;
-    let uploadedSize = 0;
-    
-    // 计算总文件大小
-    for (const file of files) {
-        totalSize += file.size;
-    }
-    
+    // 为每个文件创建进度项
+    const fileItems = [];
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const formData = new FormData();
-        formData.append('file', file);
-        
-        try {
-            await uploadFileWithProgress(file, formData, (fileProgress) => {
-                // 计算当前文件已上传的字节数
-                const currentFileUploaded = (fileProgress / 100) * file.size;
-                // 计算总体进度
-                const totalProgress = ((uploadedSize + currentFileUploaded) / totalSize) * 100;
-                
-                progressFill.style.width = totalProgress + '%';
-                progressText.textContent = Math.round(totalProgress) + '%';
-            });
-            
-            // 文件上传完成，更新已上传大小
-            uploadedSize += file.size;
-            completedFiles++;
-            
-            // 更新进度条显示完成的文件
-            const totalProgress = (uploadedSize / totalSize) * 100;
-            progressFill.style.width = totalProgress + '%';
-            progressText.textContent = Math.round(totalProgress) + '%';
-            
-        } catch (error) {
-            console.error('上传文件失败:', error);
-            showMessage(`上传文件 ${file.name} 失败: ${error.message}`, 'error');
-        }
+        const fileItem = createFileUploadItem(file, i);
+        uploadFilesContainer.appendChild(fileItem);
+        fileItems.push({
+            file: file,
+            element: fileItem,
+            id: i,
+            completed: false
+        });
     }
     
+    // 并发上传所有文件
+    const uploadPromises = fileItems.map(async (fileItem) => {
+        try {
+            await uploadSingleFile(fileItem);
+        } catch (error) {
+            console.error('上传文件失败:', error);
+            updateFileItemStatus(fileItem, 'error', error.message);
+        }
+    });
+    
+    // 等待所有文件上传完成
+    await Promise.allSettled(uploadPromises);
+    
+    // 检查是否所有文件都上传完成
+    const completedFiles = fileItems.filter(item => item.completed).length;
+    const totalFiles = fileItems.length;
+    
+    // 显示完成消息
+    if (completedFiles === totalFiles) {
+        showMessage(`成功上传 ${completedFiles} 个文件`, 'success');
+    } else {
+        showMessage(`上传完成：${completedFiles}/${totalFiles} 个文件成功`, 'warning');
+    }
+    
+    // 延迟后关闭模态框并刷新列表
     setTimeout(() => {
         hideModal(uploadModal);
         loadFileList(currentPath);
-        showMessage(`成功上传 ${completedFiles} 个文件`, 'success');
-    }, 500);
+    }, 1500);
+}
+
+// 创建单个文件上传项
+function createFileUploadItem(file, index) {
+    const fileItem = document.createElement('div');
+    fileItem.className = 'upload-file-item';
+    fileItem.id = `upload-file-${index}`;
+    
+    fileItem.innerHTML = `
+        <div class="upload-file-header">
+            <div class="upload-file-name" title="${escapeHtml(file.name)}">
+                <i class="fas fa-file upload-file-icon"></i>
+                ${escapeHtml(file.name)}
+            </div>
+            <div class="upload-file-size">${formatFileSize(file.size)}</div>
+        </div>
+        <div class="upload-file-status uploading">
+            <i class="fas fa-spinner fa-spin"></i>
+            准备上传...
+        </div>
+        <div class="upload-file-progress">
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: 0%"></div>
+            </div>
+            <div class="progress-text">0%</div>
+        </div>
+    `;
+    
+    return fileItem;
+}
+
+// 上传单个文件
+async function uploadSingleFile(fileItem) {
+    const { file, element, id } = fileItem;
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const statusElement = element.querySelector('.upload-file-status');
+    const progressFill = element.querySelector('.progress-fill');
+    const progressText = element.querySelector('.progress-text');
+    const iconElement = element.querySelector('.upload-file-icon');
+    
+    try {
+        // 更新状态为上传中
+        statusElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 上传中...';
+        statusElement.className = 'upload-file-status uploading';
+        
+        await uploadFileWithProgress(file, formData, (progress) => {
+            // 更新进度条
+            progressFill.style.width = progress + '%';
+            progressText.textContent = Math.round(progress) + '%';
+            
+            // 更新状态文本
+            statusElement.innerHTML = `<i class="fas fa-spinner fa-spin"></i> 上传中... ${Math.round(progress)}%`;
+        });
+        
+        // 上传成功
+        fileItem.completed = true;
+        updateFileItemStatus(fileItem, 'completed', '上传完成');
+        
+    } catch (error) {
+        // 上传失败
+        updateFileItemStatus(fileItem, 'error', error.message);
+        throw error;
+    }
+}
+
+// 更新文件项状态
+function updateFileItemStatus(fileItem, status, message) {
+    const { element } = fileItem;
+    const statusElement = element.querySelector('.upload-file-status');
+    const iconElement = element.querySelector('.upload-file-icon');
+    const progressFill = element.querySelector('.progress-fill');
+    const progressText = element.querySelector('.progress-text');
+    
+    // 移除所有状态类
+    element.classList.remove('completed', 'error');
+    statusElement.classList.remove('uploading', 'completed', 'error');
+    iconElement.classList.remove('completed', 'error');
+    
+    switch (status) {
+        case 'completed':
+            element.classList.add('completed');
+            statusElement.classList.add('completed');
+            iconElement.classList.add('completed');
+            statusElement.innerHTML = '<i class="fas fa-check-circle"></i> ' + message;
+            iconElement.className = 'fas fa-check-circle upload-file-icon completed';
+            progressFill.style.width = '100%';
+            progressText.textContent = '100%';
+            break;
+            
+        case 'error':
+            element.classList.add('error');
+            statusElement.classList.add('error');
+            iconElement.classList.add('error');
+            statusElement.innerHTML = '<i class="fas fa-exclamation-circle"></i> ' + message;
+            iconElement.className = 'fas fa-exclamation-circle upload-file-icon error';
+            break;
+            
+        default:
+            statusElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + message;
+            statusElement.classList.add('uploading');
+            break;
+    }
 }
 
 // 使用XMLHttpRequest实现带进度监控的文件上传

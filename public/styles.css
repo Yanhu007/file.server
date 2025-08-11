@@ -448,6 +448,134 @@ body {
     font-weight: 500;
 }
 
+/* 多文件上传容器 */
+.upload-files-container {
+    margin-top: 1rem;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.upload-file-item {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    transition: all 0.3s ease;
+}
+
+.upload-file-item:last-child {
+    margin-bottom: 0;
+}
+
+.upload-file-item.completed {
+    background-color: #d4edda;
+    border-color: #c3e6cb;
+}
+
+.upload-file-item.error {
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+}
+
+.upload-file-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.upload-file-name {
+    font-weight: 500;
+    color: #495057;
+    max-width: 60%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.upload-file-size {
+    color: #6c757d;
+    font-size: 0.85rem;
+}
+
+.upload-file-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+
+.upload-file-status.uploading {
+    color: #007bff;
+}
+
+.upload-file-status.completed {
+    color: #28a745;
+}
+
+.upload-file-status.error {
+    color: #dc3545;
+}
+
+.upload-file-progress {
+    margin-top: 0.5rem;
+}
+
+.upload-file-progress .progress-bar {
+    height: 8px;
+    background-color: #e9ecef;
+    border-radius: 4px;
+}
+
+.upload-file-progress .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #007bff, #0056b3);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.upload-file-progress .progress-text {
+    font-size: 0.8rem;
+    margin-top: 0.25rem;
+    text-align: right;
+    color: #6c757d;
+}
+
+.upload-file-close {
+    cursor: pointer;
+    color: #6c757d;
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+}
+
+.upload-file-close:hover {
+    background-color: #dee2e6;
+    color: #495057;
+}
+
+.upload-file-icon {
+    margin-right: 0.5rem;
+    color: #007bff;
+}
+
+.upload-file-icon.completed {
+    color: #28a745;
+}
+
+.upload-file-icon.error {
+    color: #dc3545;
+}
+
 /* 统计面板 */
 .dashboard-overview {
     display: grid;
