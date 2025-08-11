@@ -490,6 +490,17 @@ async function uploadFiles(files) {
     const progressText = document.getElementById('progressText');
     
     uploadProgress.style.display = 'block';
+    progressFill.style.width = '0%';
+    progressText.textContent = '0%';
+    
+    let completedFiles = 0;
+    let totalSize = 0;
+    let uploadedSize = 0;
+    
+    // 计算总文件大小
+    for (const file of files) {
+        totalSize += file.size;
+    }
     
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
@@ -497,18 +508,24 @@ async function uploadFiles(files) {
         formData.append('file', file);
         
         try {
-            const response = await fetch(`/api/upload?path=${encodeURIComponent(currentPath)}`, {
-                method: 'POST',
-                body: formData
+            await uploadFileWithProgress(file, formData, (fileProgress) => {
+                // 计算当前文件已上传的字节数
+                const currentFileUploaded = (fileProgress / 100) * file.size;
+                // 计算总体进度
+                const totalProgress = ((uploadedSize + currentFileUploaded) / totalSize) * 100;
+                
+                progressFill.style.width = totalProgress + '%';
+                progressText.textContent = Math.round(totalProgress) + '%';
             });
             
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
+            // 文件上传完成，更新已上传大小
+            uploadedSize += file.size;
+            completedFiles++;
             
-            const progress = ((i + 1) / files.length) * 100;
-            progressFill.style.width = progress + '%';
-            progressText.textContent = Math.round(progress) + '%';
+            // 更新进度条显示完成的文件
+            const totalProgress = (uploadedSize / totalSize) * 100;
+            progressFill.style.width = totalProgress + '%';
+            progressText.textContent = Math.round(totalProgress) + '%';
             
         } catch (error) {
             console.error('上传文件失败:', error);
@@ -519,8 +536,48 @@ async function uploadFiles(files) {
     setTimeout(() => {
         hideModal(uploadModal);
         loadFileList(currentPath);
-        showMessage(`成功上传 ${files.length} 个文件`, 'success');
+        showMessage(`成功上传 ${completedFiles} 个文件`, 'success');
     }, 500);
+}
+
+// 使用XMLHttpRequest实现带进度监控的文件上传
+function uploadFileWithProgress(file, formData, onProgress) {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        
+        // 监听上传进度
+        xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable) {
+                const percentComplete = (e.loaded / e.total) * 100;
+                onProgress(percentComplete);
+            }
+        });
+        
+        // 监听上传完成
+        xhr.addEventListener('load', () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                resolve(xhr.response);
+            } else {
+                reject(new Error(`HTTP error! status: ${xhr.status}`));
+            }
+        });
+        
+        // 监听上传错误
+        xhr.addEventListener('error', () => {
+            reject(new Error('上传请求失败'));
+        });
+        
+        // 监听上传中断
+        xhr.addEventListener('abort', () => {
+            reject(new Error('上传被中断'));
+        });
+        
+        // 配置请求
+        xhr.open('POST', `/api/upload?path=${encodeURIComponent(currentPath)}`);
+        
+        // 发送请求
+        xhr.send(formData);
+    });
 }
 
 // 创建文件夹
