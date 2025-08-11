@@ -1,0 +1,12 @@
+{
+  "latest": "1.0.17",
+  "releaseNotes": "更新说明",
+  "releaseDate": "2025-01-15T10:30:00.000Z",
+  "downloadUrls": {
+    "darwin-arm64": "KOSMOS-1.0.17-mac-arm64.dmg",
+    "darwin-x64": "KOSMOS-1.0.17-mac-x64.dmg",
+    "win32-arm64": "KOSMOS-1.0.17-win-arm64.exe",
+    "win32-x64": "KOSMOS-1.0.17-win-x64.exe",
+    "linux-x64": "KOSMOS-1.0.17-linux-x64.AppImage"
+  }
+}
